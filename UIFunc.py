@@ -122,6 +122,8 @@ class UIFunc(QMainWindow, Ui_UIView, QtStyleTools):
         self.stimes.setValue(int(self.config.value("Config/LoopTimes")))
         self.mouse_move_interval_ms.setValue(int(self.config.value("Config/Precision")))
         self.execute_speed.setValue(int(self.config.value("Config/ExecuteSpeed")))
+        self.cb_only_keyboard.setChecked(self.config.value("Config/OnlyKeyboard").lower() == "true")
+        self.cb_ignore_delay.setChecked(self.config.value("Config/IgnoreDelay").lower() == "true")
         self.choice_extension.setCurrentText(self.config.value("Config/Extension"))
         self.choice_theme.setCurrentText(self.config.value("Config/Theme"))
         if self.config.value('Config/Script') is not None and self.config.value('Config/Script') in self.scripts:
@@ -131,6 +133,8 @@ class UIFunc(QMainWindow, Ui_UIView, QtStyleTools):
         self.choice_record.currentIndexChanged.connect(self.onconfigchange)
         self.stimes.valueChanged.connect(self.onconfigchange)
         self.execute_speed.valueChanged.connect(self.onconfigchange)
+        self.cb_only_keyboard.stateChanged.connect(self.onconfigchange)
+        self.cb_ignore_delay.stateChanged.connect(self.onconfigchange)
         self.mouse_move_interval_ms.valueChanged.connect(self.onconfigchange)
         self.mouse_move_interval_ms.valueChanged.connect(Recorder.set_interval)
         self.choice_extension.currentIndexChanged.connect(self.onconfigchange)
@@ -179,6 +183,7 @@ class UIFunc(QMainWindow, Ui_UIView, QtStyleTools):
 
         self.extension = None
 
+        # region callback
         # 热键响应逻辑
         def hotkeymethod(key_name):
             start_index = self.choice_start.currentIndex()
@@ -261,6 +266,8 @@ class UIFunc(QMainWindow, Ui_UIView, QtStyleTools):
                     return
             # 录制事件
             if not(not self.recording or self.running or self.pauserecord):
+                if self.cb_only_keyboard.isChecked() and event.event_type != 'EK':
+                    return
                 if self.extension.onrecord(event, self.actioncount):
                     if event.event_type == 'EM' and not flag_multiplemonitor:
                         record = [event.delay, event.event_type, event.message]
@@ -275,6 +282,8 @@ class UIFunc(QMainWindow, Ui_UIView, QtStyleTools):
                     text = '%d actions recorded' % self.actioncount
                     logger.debug('Recorded %s' % event)
                     self.tnumrd.setText(text)
+            return
+        # endregion callback
         logger.debug('Initialize at thread ' + str(threading.currentThread()))
         Recorder.setuphook()
         Recorder.set_callback(on_record_event)
@@ -295,6 +304,8 @@ class UIFunc(QMainWindow, Ui_UIView, QtStyleTools):
         self.config.setValue("Config/Extension", self.choice_extension.currentText())
         self.config.setValue("Config/Theme", self.choice_theme.currentText())
         self.config.setValue("Config/Script", self.choice_script.currentText())
+        self.config.setValue("Config/OnlyKeyboard", self.cb_only_keyboard.isChecked())
+        self.config.setValue("Config/IgnoreDelay", self.cb_ignore_delay.isChecked())
 
     def onchangelang(self):
         global scripts_map
@@ -340,7 +351,10 @@ class UIFunc(QMainWindow, Ui_UIView, QtStyleTools):
                         'ExecuteSpeed=100\n'
                         'Language=zh-cn\n'
                         'Extension=Extension\n'
-                        'Theme=light_cyan_500.xml\n')
+                        'Theme=light_cyan_500.xml\n'
+                        'OnlyKeyboard=False\n'
+                        'IgnoreDelay=False\n'
+                        )
         return QSettings(to_abs_path('config.ini'), QSettings.IniFormat)
 
     def get_script_path(self):
@@ -413,6 +427,7 @@ class UIFunc(QMainWindow, Ui_UIView, QtStyleTools):
             self.record = []
             self.btpauserecord.setEnabled(False)
             self.btrun.setEnabled(True)
+            self.cb_only_keyboard.setEnabled(True)
             self.actioncount = 0
             self.pauserecord = False
             self.choice_script.setCurrentIndex(0)
@@ -432,6 +447,7 @@ class UIFunc(QMainWindow, Ui_UIView, QtStyleTools):
             self.record = []
             self.btpauserecord.setEnabled(True)
             self.btrun.setEnabled(False)
+            self.cb_only_keyboard.setEnabled(False)
 
     def OnBtrecordButton(self):
         if self.recording:
@@ -463,6 +479,8 @@ class RunScriptClass(QThread):
         self.tnumrdSignal.connect(frame.tnumrd.setText)
         self.btnSignal.connect(frame.btrun.setEnabled)
         self.btnSignal.connect(frame.btrecord.setEnabled)
+        self.btnSignal.connect(frame.cb_only_keyboard.setEnabled)
+        self.btnSignal.connect(frame.cb_ignore_delay.setEnabled)
 
     def pause(self):
         mutex.lock()
@@ -530,7 +548,7 @@ class RunScriptClass(QThread):
             nointerrupt = True
             logger.debug('Run script..')
             extension.onbeginp()
-            self.frame.playtune('start.wav')
+            # self.frame.playtune('start.wav')  #播放声音会卡住
             while (self.j < extension.runtimes or extension.runtimes == 0) and nointerrupt:
                 logger.debug('===========%d==============' % self.j)
                 current_status = self.frame.tnumrd.text()
@@ -542,7 +560,8 @@ class RunScriptClass(QThread):
                 try:
                     if extension.onbeforeeachloop(self.j):
                         nointerrupt = nointerrupt and RunScriptClass.run_script_once(events, extension, thd=self,
-                                                                                     labeldict=labeldict)
+                                                                                     labeldict=labeldict,
+                                                                                     ignore_delay=self.frame.cb_ignore_delay.isChecked())
                     else:
                         nointerrupt = True
                     extension.onaftereachloop(self.j)
@@ -555,7 +574,7 @@ class RunScriptClass(QThread):
                     logger.debug('End')
                     break
             extension.onendp()
-            self.frame.playtune('end.wav')
+            # self.frame.playtune('end.wav')
             if nointerrupt:
                 self.tnumrdSignal.emit('finished')
                 logger.info('Script run finish')
@@ -687,7 +706,7 @@ class RunScriptClass(QThread):
 
     # 执行集合中的ScriptEvent
     @classmethod
-    def run_script_once(cls, events, extension, thd=None, labeldict=None):
+    def run_script_once(cls, events, extension, thd=None, labeldict=None, ignore_delay=False):
         steps = len(events)
         i = 0
         while i < steps:
@@ -707,7 +726,7 @@ class RunScriptClass(QThread):
                 flag = extension.onrunbefore(event, i)
                 if flag:
                     logger.debug(event)
-                    event.execute(thd)
+                    event.execute(thd, ignore_delay)
                 else:
                     logger.debug('Skipped %d' % i)
                 extension.onrunafter(event, i)

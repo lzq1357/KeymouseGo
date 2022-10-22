@@ -25,8 +25,9 @@ class UniversalEvent(Event):
             else:
                 self.action[1] = int(y * SH)
 
-    def execute(self, thd=None):
-        self.sleep(thd)
+    def execute(self, thd=None, ignore_delay=False):
+        if not ignore_delay:
+            self.sleep(thd)
 
         if self.event_type == 'EM':
             x, y = self.action

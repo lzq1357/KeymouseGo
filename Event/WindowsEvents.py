@@ -32,8 +32,9 @@ class WindowsEvent(Event):
                 self.action[1] = int(y * 65535)
 
     # 执行操作
-    def execute(self, thd=None):
-        self.sleep(thd)
+    def execute(self, thd=None, ignore_delay=False):
+        if not ignore_delay:
+            self.sleep(thd)
 
         if self.event_type == 'EM':
             x, y = self.action

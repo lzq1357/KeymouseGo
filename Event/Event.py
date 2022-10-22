@@ -30,5 +30,5 @@ class Event(metaclass=ABCMeta):
             time.sleep(self.delay / 1000.0)
 
     @abstractmethod
-    def execute(self, thd=None):
+    def execute(self, thd=None, ignore_delay=False):
         pass

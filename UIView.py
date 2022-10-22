@@ -248,6 +248,23 @@ class Ui_UIView(object):
 
         self.gridLayout_4.addLayout(self.gridLayout, 0, 1, 1, 1)
 
+        self.horizontalLayout_2 = QHBoxLayout()
+        self.horizontalLayout_2.setObjectName(u"horizontalLayout_2")
+        self.cb_only_keyboard = QCheckBox(self.groupBox_2)
+        self.cb_only_keyboard.setObjectName(u"cb_only_keyboard")
+        self.cb_only_keyboard.setTristate(False)
+
+        self.horizontalLayout_2.addWidget(self.cb_only_keyboard)
+
+        self.cb_ignore_delay = QCheckBox(self.groupBox_2)
+        self.cb_ignore_delay.setObjectName(u"cb_ignore_delay")
+        self.cb_ignore_delay.setTristate(False)
+
+        self.horizontalLayout_2.addWidget(self.cb_ignore_delay)
+
+
+        self.gridLayout_4.addLayout(self.horizontalLayout_2, 5, 0, 1, 2)
+
         UIView.setCentralWidget(self.centralwidget)
         self.menubar = QMenuBar(UIView)
         self.menubar.setObjectName(u"menubar")
@@ -283,5 +300,7 @@ class Ui_UIView(object):
         self.label_theme.setText(QCoreApplication.translate("UIView", u"Theme", None))
         self.label_script.setText(QCoreApplication.translate("UIView", u"Script", None))
         self.bt_open_script_files.setText(QCoreApplication.translate("UIView", u"...", None))
+        self.cb_only_keyboard.setText(QCoreApplication.translate("UIView", u"\u4ec5\u5f55\u952e\u76d8", None))
+        self.cb_ignore_delay.setText(QCoreApplication.translate("UIView", u"\u5ffd\u7565\u5ef6\u8fdf", None))
     # retranslateUi
 
